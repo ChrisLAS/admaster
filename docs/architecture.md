@@ -16,6 +16,8 @@ after dependencies are built, and no Codex/OpenCode/Hermes-specific runtime.
    gains/fades, optionally recovers a short terminal tail, and renders the dry timeline.
 4. **Plan:** calculate sample-accurate edge trims and low-level gap edits. Fail if
    conservative capacity is insufficient. Original voice speed is an invariant.
+   Reads already up to one second below the requested duration keep their runtime
+   unless `--exact-duration` is specified. The chosen plan remains sample-accurate.
 5. **Apply:** native splits/deletes/ripple position changes, crossfades, profile FX,
    explicit sample rate/channel format and exact render bounds. Read plugin state back.
 6. **Render/adjust:** invoke REAPER `-renderproject`, measure output loudness, make

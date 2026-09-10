@@ -71,6 +71,50 @@ class CoreTests(unittest.TestCase):
         with self.assertRaises(MasterError):
             plan(x, 44100, [{"position": 0, "length": 4}], load_profile(), "3.9", True)
 
+    def test_slightly_short_reads_preserve_timing(self):
+        sr = 1000
+        for seconds in (60, 90):
+            for shortfall in (0, 0.567, 1):
+                for no_edit in (False, True):
+                    with self.subTest(
+                        seconds=seconds, shortfall=shortfall, no_edit=no_edit
+                    ):
+                        frames = round((seconds - shortfall) * sr)
+                        x = np.full((frames, 1), 0.1)
+                        items = [{"position": 0, "length": frames / sr}]
+                        result = plan(x, sr, items, load_profile(), seconds, no_edit)
+                        self.assertEqual(result["target_frames"], frames)
+                        self.assertEqual(result["removed_frames"], 0)
+                        self.assertEqual(result["cuts"], [])
+                        self.assertEqual(result["rate"], 1)
+
+    def test_short_read_limits_and_exact_duration(self):
+        sr = 1000
+        for seconds in (60, 90):
+            for shortfall, exact in ((1.001, False), (0.567, True)):
+                for no_edit in (False, True):
+                    with self.subTest(
+                        seconds=seconds,
+                        shortfall=shortfall,
+                        exact=exact,
+                        no_edit=no_edit,
+                    ):
+                        frames = round((seconds - shortfall) * sr)
+                        with self.assertRaises(MasterError) as error:
+                            plan(
+                                np.full((frames, 1), 0.1),
+                                sr,
+                                [{"position": 0, "length": frames / sr}],
+                                load_profile(),
+                                seconds,
+                                no_edit,
+                                exact,
+                            )
+                        self.assertEqual(
+                            error.exception.code,
+                            "duration_no_edit" if no_edit else "duration_too_long",
+                        )
+
     def test_cli_json_failure(self):
         p = subprocess.run(
             [sys.executable, "-m", "admaster", "missing.rpp", "--json"],

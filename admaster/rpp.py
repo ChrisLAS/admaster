@@ -243,7 +243,7 @@ def inspect(path):
         )
     for a, b in zip(layout, layout[1:]):
         overlap = a["position"] + a["length"] - b["position"]
-        if overlap < -1e-6 or overlap > 0.1:
+        if abs(overlap) > 0.1 + 1e-9:
             raise MasterError(
                 "unsupported_project", "gaps or overlaps over 100 ms require review"
             )

@@ -136,7 +136,9 @@ def loudness(path, log=None):
         ) from e
 
 
-def validate(path, profile, target_frames=None, log=None, boundaries=()):
+def validate(
+    path, profile, target_frames=None, log=None, boundaries=(), *, shortfall_frames=0
+):
     x, sr = read(path)
     meta = probe(path)
     r = profile["render"]
@@ -152,7 +154,9 @@ def validate(path, profile, target_frames=None, log=None, boundaries=()):
         errors.append("format")
     if (
         target_frames is not None
-        and abs(len(x) - target_frames) > r["duration_tolerance_samples"]
+        and not -max(shortfall_frames, r["duration_tolerance_samples"])
+        <= len(x) - target_frames
+        <= r["duration_tolerance_samples"]
     ):
         errors.append("duration")
     if abs(m["lufs"] - r["lufs"]) > r["lufs_tolerance"]:

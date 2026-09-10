@@ -55,7 +55,7 @@ def main():
             root / "portable/master.rpp",
             "--no-edit",
             "--duration",
-            "19",
+            "20",
             "--no-render",
             "--output",
             root / "prepared",
@@ -64,6 +64,39 @@ def main():
             prepared["status"] == "prepared" and not prepared["validation"]["complete"]
         )
         assert not (root / "prepared/master.wav").exists()
+        assert prepared["duration"] == 19
+        assert prepared["requested_duration"] == 20
+        assert prepared["duration_shortfall_seconds"] == 1
+
+        gapped = root / "gapped.rpp"
+        gapped.write_text(
+            "<REAPER_PROJECT\n<TRACK\n"
+            "<ITEM\nPOSITION 0\nLENGTH 2.2\n"
+            '<SOURCE WAVE\nFILE "source.wav"\n>\n>\n'
+            "<ITEM\nPOSITION 2.25\nLENGTH 17.75\nSOFFS 2.25\n"
+            '<SOURCE WAVE\nFILE "source.wav"\n>\n>\n>\n>\n'
+        )
+        assert run(gapped, "--analyze-only")["status"] == "analyzed"
+        short = run(gapped, "--duration", "21", "--output", root / "short")
+        assert short["status"] == "complete" and short["validation"]["complete"]
+        assert short["frames"] == 20 * sr and short["stretch_percent"] == 0
+        assert short["requested_duration"] == 21
+        assert short["duration_shortfall_seconds"] == 1
+        assert short["pause_cuts"] == 0
+        short_inventory = json.loads((root / "short/work/inventory.json").read_text())
+        assert abs(short_inventory["items"][1]["position"] - 2.25) < 1e-8
+        assert run("--validate-render", root / "short/master.wav", "--duration", "21")[
+            "valid"
+        ]
+        exact = run(
+            "--validate-render",
+            root / "short/master.wav",
+            "--duration",
+            "21",
+            "--exact-duration",
+            expected=2,
+        )
+        assert "duration" in exact["errors"]
         failure = run(
             root / "source.rpp",
             "--no-edit",
@@ -95,7 +128,7 @@ def main():
         )
         assert "duration" in failure["errors"]
         print(
-            "PASS: isolated REAPER, plugins, 19-second render, loudness, media preservation, failure handling"
+            "PASS: isolated REAPER, plugins, exact and slightly short renders, gapped timeline, loudness, media preservation, failure handling"
         )
 
 

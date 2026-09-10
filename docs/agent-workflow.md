@@ -9,6 +9,12 @@ means a project exists but the final WAV has not been rendered/verified. `analyz
 means the input was inspected without retained outputs. A failed job may contain
 candidate WAVs; these are not deliverables.
 
+`--duration` allows up to one second under the requested runtime. Preserve a read
+already in that window, including with `--no-edit`; do not pad or slow it.
+`--exact-duration` restores a strict target. Report requested and actual runtime
+and `duration_shortfall_seconds`. Standalone render validation uses the same
+allowance; the mastering pipeline still validates against its exact planned length.
+
 | Failure | Next action |
 | --- | --- |
 | `dependency`, `reaper_protocol`, `reaper_timeout` | Bootstrap/doctor, then inspect REAPER logs and external licensing; use pinned dependencies |
@@ -16,8 +22,9 @@ candidate WAVs; these are not deliverables.
 | `missing_media`, `source_changed` | Locate the correct recording or wait for copying/syncing to finish; never substitute a different take silently |
 | `unsupported_project` | Inspect the named unsupported state; derive a simple dialogue project manually if authorized |
 | `source_level`, `source_clipping`, `source_silence` | Review audio; the automatic clean-read workflow cannot diagnose/repair every source |
-| `timing_capacity`, `timing_limit`, `duration_too_long` | Report achievable reduction; request a revised target or reviewed manual edit; never enable stretching or cut copy silently |
-| `duration_no_edit` | Exact duration conflicts with preserving timing; explain the conflict |
+| `timing_capacity`, `timing_limit` | Report achievable reduction; request a revised target or reviewed manual edit; never enable stretching or cut copy silently |
+| `duration_too_long` | Read is too short for the requested duration and allowance; revise the target or review the source; never pad or slow it automatically |
+| `duration_no_edit` | Preserved runtime falls outside the requested duration window; explain the conflict |
 | `gain_limit`, `limiter_load`, `validation` | Inspect `work/gain-passes.json`, `work/validation.json`, and loudness logs; listen before changing profile limits |
 | `output_exists` | Choose a fresh job path; preserve previous work |
 

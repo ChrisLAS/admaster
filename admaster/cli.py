@@ -20,7 +20,16 @@ def parser():
         description="Master one continuous mono ad read at its original speed.",
     )
     p.add_argument("project", nargs="?", type=Path)
-    p.add_argument("--duration", metavar="SECONDS")
+    p.add_argument(
+        "--duration",
+        metavar="SECONDS",
+        help="requested runtime; accepts up to 1 second under",
+    )
+    p.add_argument(
+        "--exact-duration",
+        action="store_true",
+        help="require --duration to within one sample",
+    )
     p.add_argument("--profile", type=Path)
     p.add_argument("--output", type=Path, help="new job directory (must not exist)")
     p.add_argument(
@@ -166,7 +175,13 @@ def process(args, profile):
                     "auditory_review": "not_performed",
                 }
             plan = timing.plan(
-                x, sr, prepared["items"], profile, args.duration, args.no_edit
+                x,
+                sr,
+                prepared["items"],
+                profile,
+                args.duration,
+                args.no_edit,
+                args.exact_duration,
             )
             write_json(work / "plan.json", plan)
             gain = profile["gain"]["initial_db"]
@@ -177,6 +192,17 @@ def process(args, profile):
             )
             write_json(work / "inventory.json", inventory)
             base = {
+                "requested_duration": float(args.duration) if args.duration else None,
+                "duration_allowance_seconds": (
+                    timing.DURATION_ALLOWANCE_SECONDS
+                    if args.duration and not args.exact_duration
+                    else 0
+                ),
+                "duration_shortfall_seconds": (
+                    max(0, float(args.duration) - plan["target_frames"] / sr)
+                    if args.duration
+                    else None
+                ),
                 "original_duration": info["duration"],
                 "duration": plan["target_frames"] / sr,
                 "adjustment_seconds": plan["target_frames"] / sr - info["duration"],
@@ -275,6 +301,10 @@ def process(args, profile):
                 "source_hashes": hashes,
                 "render_sha256": rpp.sha256(render),
             }
+            if args.duration:
+                result["duration_shortfall_seconds"] = max(
+                    0, float(args.duration) - result["duration"]
+                )
             write_json(output / "report.json", result)
             return result
     except Exception as e:
@@ -299,6 +329,13 @@ def main(argv=None):
     args = parser().parse_args(argv)
     try:
         profile = load_profile(args.profile)
+        if args.exact_duration and (
+            not args.duration or args.doctor or args.analyze_only
+        ):
+            raise MasterError(
+                "arguments",
+                "--exact-duration requires --duration in a job or render validation",
+            )
         modes = sum((args.doctor, args.analyze_only, bool(args.validate_render)))
         if args.doctor and (
             args.duration or args.output or args.no_edit or args.no_render
@@ -329,7 +366,29 @@ def main(argv=None):
                 if args.duration
                 else None
             )
-            result = audio.validate(args.validate_render, profile, target)
+            result = audio.validate(
+                args.validate_render,
+                profile,
+                target,
+                shortfall_frames=(
+                    timing.DURATION_ALLOWANCE_SECONDS * profile["render"]["sample_rate"]
+                    if target is not None and not args.exact_duration
+                    else 0
+                ),
+            )
+            result["requested_duration"] = (
+                float(args.duration) if args.duration else None
+            )
+            result["duration_allowance_seconds"] = (
+                timing.DURATION_ALLOWANCE_SECONDS
+                if args.duration and not args.exact_duration
+                else 0
+            )
+            result["duration_shortfall_seconds"] = (
+                max(0, float(args.duration) - result["duration"])
+                if args.duration
+                else None
+            )
             result["status"] = "validated" if result["valid"] else "failed"
             if args.json:
                 print(json.dumps(result, allow_nan=False))
@@ -356,6 +415,11 @@ def main(argv=None):
             print(
                 f"Ad master complete\n\nDuration:   {result['duration']:.3f} s\nLoudness:   {result['lufs']:.2f} LUFS\nTrue peak:  {result['true_peak_db']:.2f} dBTP\nAdjustment: {result['adjustment_seconds']:+.3f} s\nStretch:    0.0%\nRender:     {result['render']}\nListening:  pending"
             )
+            if args.duration:
+                print(
+                    f"Requested:  {result['requested_duration']:.3f} s\n"
+                    f"Shortfall:  {result['duration_shortfall_seconds']:.3f} s"
+                )
         elif result["status"] == "ready":
             print(
                 "Admaster ready: REAPER "

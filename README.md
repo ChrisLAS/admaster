@@ -95,7 +95,8 @@ beside the original media, rather than opening it as the derived project.
 
 | Option | Effect |
 | --- | --- |
-| `--duration 90` | Exactly 3,969,000 samples at 44.1 kHz; arbitrary targets round to nearest sample, tolerance one sample |
+| `--duration 90` | Target 90 seconds; an existing read from 89–90 seconds keeps its runtime. Longer reads are shortened to 90 seconds using safe pause edits |
+| `--exact-duration` | With `--duration`, require the requested runtime to within one sample; no one-second allowance |
 | `--profile path.toml` | Complete custom profile; strict schema/safety validation |
 | `--analyze-only` | Read-only analysis of unprocessed project timeline; no retained output |
 | `--no-edit` | Preserve timing; apply the standard processing chain |
@@ -109,6 +110,16 @@ With no duration, only eligible leading/trailing silence is tightened. If a targ
 requires deleting speech, excessive cuts, extending the read, or speeding up the
 voice, the command fails. A meter cannot prove naturalness: `auditory_review` stays
 `not_performed` until a human or capable listening tool actually auditions the result.
+
+The one-second allowance applies to all requested durations, including 60-second
+and 90-second slots, and to `--no-edit` and `--validate-render`. A 59.433-second
+read can therefore satisfy `--duration 60` without padding or slowing speech.
+Reads more than one second short still stop for review. Longer reads target the
+requested runtime; the allowance does not permit overruns or relax pause-edit guards.
+JSON reports include `requested_duration`, actual `duration`,
+`duration_allowance_seconds`, and `duration_shortfall_seconds`. Internal render QC
+still checks the chosen plan to within one sample. Use `--exact-duration` for strict
+delivery requirements. Targets round to the nearest output sample.
 
 ## Nix installation
 

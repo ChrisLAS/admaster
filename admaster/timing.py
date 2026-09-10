@@ -4,6 +4,8 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from .audio import features
 from .errors import MasterError
 
+DURATION_ALLOWANCE_SECONDS = 1
+
 
 def duration_frames(seconds, sr):
     try:
@@ -20,12 +22,18 @@ def duration_frames(seconds, sr):
         ) from None
 
 
-def plan(x, sr, items, profile, seconds=None, no_edit=False):
+def plan(x, sr, items, profile, seconds=None, no_edit=False, exact_duration=False):
     t = profile["timing"]
     q = profile["quality"]
     f = features(x, sr, t["quiet_db"])
     original = len(x)
     target = duration_frames(seconds, sr) if seconds is not None else original
+    if (
+        seconds is not None
+        and not exact_duration
+        and 0 <= target - original <= DURATION_ALLOWANCE_SECONDS * sr
+    ):
+        target = original
     if (
         f["clipped_samples"]
         or f["longest_clip_seconds"] > q["maximum_peak_plateau_seconds"]
@@ -59,7 +67,7 @@ def plan(x, sr, items, profile, seconds=None, no_edit=False):
     if target > original + 1:
         raise MasterError(
             "duration_too_long",
-            "target exceeds the read; refusing to pad or slow speech",
+            "read is shorter than the requested duration window; refusing to pad or slow speech",
         )
     need = max(0, original - target)
     edge_limit = round(t["maximum_edge_trim_seconds"] * sr)

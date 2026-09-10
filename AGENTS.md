@@ -28,6 +28,10 @@ Never store recordings inside this repository or commit job directories.
   stretching to make a duration fit. `timing_capacity` means pause edits cannot
   safely meet the request; explain the available reduction and obtain a revised
   target or an explicitly reviewed manual edit.
+- `--duration` accepts an existing read up to one second short (59–60 seconds for
+  a 60-second slot, 89–90 for 90). Longer reads still target the requested runtime.
+  No padding or slowing is added. Use `--exact-duration` with `--duration` when
+  exact timing is required. Report requested and actual duration plus shortfall.
 - Use `--analyze-only --json` for read-only unprocessed timeline analysis.
   `--no-edit` preserves timing while mastering. `--no-render` prepares a project;
   it is **not** a finished/validated render.

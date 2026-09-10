@@ -59,6 +59,16 @@ item boundaries and evaluates quiet interiors. Head/tail excess is removed first
 then longest eligible gaps are shortened proportionally up to available capacity.
 It stops once the target is feasible instead of trimming every pause.
 
+A requested slot permits up to one second of shortfall: an existing 59–60-second
+read fits a 60-second request, and an 89–90-second read fits a 90-second request.
+An already-short read in this window retains its runtime; longer reads still
+target the requested duration using safe cuts. This allowance also applies to
+other slot lengths. `--exact-duration` disables it. Neither mode pads silence or
+slows speech. The final WAV must still match the selected timing plan to within
+one sample; the report distinguishes the requested slot from actual duration.
+The window is evaluated after the existing bounded word-tail recovery described
+below. Use `--no-edit` to preserve the original timing including the terminal item.
+
 Default guards include a -50 dBFS sample-peak quiet threshold, gap length at least
 330 ms, at least 200 ms retained quiet space, at most 65% reduction per gap,
 24 new cuts/minute, and at most 12% total duration reduction. Speech's 95th-percentile
