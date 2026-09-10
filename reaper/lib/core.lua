@@ -95,7 +95,9 @@ function C.inventory()
    plugins[#plugins+1]={name=name,enabled=reaper.TrackFX_GetEnabled(track,fx),parameters=params,true_peak=truepeak}
   end
  end
- return {items=items,plugins=plugins,duration=reaper.GetProjectLength(0),reaper_version=reaper.GetAppVersion()}
+ local hardware={}
+ for i=0,reaper.GetTrackNumSends(master,1)-1 do hardware[#hardware+1]=reaper.GetTrackSendInfo_Value(master,1,i,'I_DSTCHAN') end
+ return {items=items,plugins=plugins,hardware_outputs=hardware,duration=reaper.GetProjectLength(0),reaper_version=reaper.GetAppVersion()}
 end
 function C.render_settings(job,path,duration,dither)
  for key,value in pairs({PROJECT_SRATE=job.profile.render.sample_rate,PROJECT_SRATE_USE=1,

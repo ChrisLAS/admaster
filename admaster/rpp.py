@@ -94,6 +94,7 @@ def inspect(path):
         root.number("PLAYRATE", 1) != 1
         or tr.number("MAINSEND", 1) != 1
         or tr.values("AUXRECV")
+        or tr.values("HWOUT")
     ):
         raise MasterError(
             "unsupported_project", "non-unity project rate or custom routing"

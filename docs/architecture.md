@@ -28,6 +28,9 @@ after dependencies are built, and no Codex/OpenCode/Hermes-specific runtime.
 REAPER runs under Xvfb with `-newinst -cfgfile` and a temporary resource directory.
 Render destinations are resolved per job: REAPER 7.79 batch rendering did not
 reliably honor a relative destination. Media references remain relative.
+The derived project resets hardware monitoring to outputs 1/2 rather than carrying
+an old host’s interface-channel assignment. Original projects and global device
+preferences are unchanged.
 The process never attaches to an active instance and does not require PipeWire,
 JACK, an audio interface or a desktop session. A process-group timeout terminates
 only the owned REAPER/Xvfb process tree. Licensing is external and not redistributed.

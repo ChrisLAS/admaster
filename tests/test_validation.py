@@ -59,6 +59,12 @@ class ValidationTests(unittest.TestCase):
             with self.assertRaises(MasterError) as e:
                 rpp.inspect(path)
             self.assertEqual(e.exception.code, "unsupported_project")
+            path.write_text(
+                original.replace(" NAME Dialogue", " NAME Dialogue\n HWOUT 4 0 1")
+            )
+            with self.assertRaises(MasterError) as e:
+                rpp.inspect(path)
+            self.assertEqual(e.exception.code, "unsupported_project")
 
     def test_invalid_rates_and_nonfinite_fields(self):
         with tempfile.TemporaryDirectory() as d:

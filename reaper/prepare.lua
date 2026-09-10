@@ -2,6 +2,11 @@ return function(job,C)
  local before=C.inventory()
  local tr=reaper.GetTrack(0,0);local master=reaper.GetMasterTrack(0)
  reaper.SetMediaTrackInfo_Value(tr,'I_RECARM',0)
+ -- Hardware channel assignments belong to the old host, not the mastering profile.
+ for i=reaper.GetTrackNumSends(master,1)-1,0,-1 do reaper.RemoveTrackSend(master,1,i) end
+ local output=assert(reaper.CreateTrackSend(master,nil))
+ assert(output>=0,'Cannot create default monitoring output')
+ reaper.SetTrackSendInfo_Value(master,1,output,'I_DSTCHAN',0)
  reaper.SetMediaTrackInfo_Value(tr,'D_VOL',1)
  reaper.SetMediaTrackInfo_Value(master,'D_VOL',1)
  reaper.SetMediaTrackInfo_Value(tr,'I_FXEN',0)

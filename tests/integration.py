@@ -41,6 +41,7 @@ def main():
         assert check["valid"]
         inventory = json.loads((root / "result/work/inventory.json").read_text())
         assert inventory["plugins"][-1]["true_peak"] is True
+        assert inventory["hardware_outputs"] == [0]
         params = {p["name"]: p["value"] for p in inventory["plugins"][1]["parameters"]}
         assert params["RMS size"] == "5.0" and params["Ratio"] == "2.00"
         assert result["limiter"]["valid"]
