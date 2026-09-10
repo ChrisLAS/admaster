@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+command -v nix >/dev/null || { echo 'Install Nix first: https://nixos.org/download/' >&2; exit 1; }
+repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+exec nix --extra-experimental-features 'nix-command flakes' run "$repo_dir" -- --doctor "$@"
