@@ -40,7 +40,8 @@ initial_db = 11.92
 minimum_db = -6.0
 maximum_db = 18.0
 max_correction_db = 6.0
-max_passes = 3
+# Measured slope/bracket search, with early stall detection (not blind retries).
+max_passes = 8
 
 [timing]
 # The approved reference rejected even 2.35% stretching. Never stretch by default.

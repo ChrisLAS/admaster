@@ -82,8 +82,17 @@ word tail. This is bounded look-ahead, not generation or arbitrary padding. The
 existing take is never reconstructed from alternate performances. `--no-edit`
 disables this recovery as well as pause/edge edits.
 
-Output gain starts at the approved +11.92 dB and is adjusted by measured loudness,
-within explicit profile bounds and a limited number of renders. A separate attenuated
+Output gain stays after track EQ/compression and before master ReaLimit. Moving it
+before the compressor would change the reviewed dynamics; a post-limiter trim
+would bypass the measured limiter relationship. ReaLimit's non-linear response
+means one dB of this gain need not produce one LU of program loudness. The search
+starts at the approved +11.92 dB, estimates the measured two-point response,
+uses a bracket to safeguard overshoot, and retains the existing gain range and
+six-dB per-step bound. It allows at most eight measured renders, stops after two
+unsuccessful improvement opportunities (<0.05 LU best-error improvement), and
+does not retry independent format/timing/peak/boundary failures. Partial history
+and validation are persisted after every measurement, including failure cases.
+A separate attenuated
 pre-limiter render checks that maximum 10 ms RMS reduction stays below 6 dB and
 that reduction over 3 dB affects at most 2% of active windows. The approved reference
 was approximately 3.68 dB maximum and 0.125% over 3 dB. Tone is not

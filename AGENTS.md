@@ -17,10 +17,13 @@ Never store recordings inside this repository or commit job directories.
 
 ## Operating contract
 
-- Supported: one mono dialogue track, one continuous WAV/FLAC source, existing
+- Supported: direct WAV/FLAC or one dialogue track with one continuous source, existing
   splits/crossfades, unity playback rates. Stock ReaEQ/ReaComp/ReaLimit source FX
   are supported. Active automation, alternate takes, complex routing, other FX,
-  stereo sources, and source overruns stop for review.
+  distinct stereo sources, and source overruns stop for review. Exactly identical
+  stereo is decoded once to lossless mono in the derived job; no automatic downmix.
+  `--no-edit` preserves manual spacing, including gaps over 100 ms. Item
+  `EXT ORIGINAL_FILENAME` provenance is benign; unknown extension state still stops.
 - The tool preserves originals and copies media into a portable derived job.
   It runs isolated REAPER on Xvfb; it never controls the user's live REAPER session.
 - Standard profile: `profiles/ad-read.toml`. **Original speed only.** Even 2.35%

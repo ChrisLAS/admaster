@@ -43,10 +43,24 @@ Without entering a shell (flakes enabled):
 nix run . -- ~/ads/example/project.rpp --duration 90 --json
 ```
 
-Input scope: **one mono track, one continuous WAV/FLAC recording**, with existing
+Input scope: **a direct WAV/FLAC file or one dialogue track with one continuous recording**, with existing
 splits, fades and item gains. Input sample rates may differ; output defaults to
 44.1 kHz mono 24-bit WAV. Only stock ReaEQ/ReaComp/ReaLimit input chains are accepted.
 More complex projects fail explicitly; isolate the dialogue or review them first.
+
+Mono files are copied unchanged. Exactly identical stereo is decoded to a mono
+float64 WAV in the derived job without averaging, resampling or changing frames;
+the original media copy and both hashes are retained. Distinct stereo is rejected:
+channel selection/downmix requires a separate reviewed policy, not an implicit sum.
+For an approved manual edit, use `--no-edit`: positions, offsets, fades and gaps
+are retained (only terminal sub-sample rounding may change length). Item
+`EXT ORIGINAL_FILENAME` provenance is accepted; unknown extension state, active
+automation, unsupported routing and overlaps over 100 ms still stop for review.
+
+```sh
+admaster /absolute/path/voice.wav --no-edit --duration 60 --output /new/job --json
+admaster /absolute/path/edited.RPP --no-edit --duration 60 --output /new/edited-job --json
+```
 
 ## Agent use
 
@@ -80,7 +94,7 @@ project-admaster/
 ├── master.rpp              # editable, self-contained with relative media paths
 ├── master.wav              # validated mono 24-bit master
 ├── media/                  # copied original source, identified by checksum
-├── original.rpp.backup     # unchanged input text; for restoration/audit
+├── original.rpp.backup     # project inputs only; unchanged input text
 ├── profile.toml            # exact profile used
 ├── report.json             # concise status + validation + provenance
 └── work/                   # cut plan, FX readback, intermediate WAVs and logs
@@ -190,6 +204,9 @@ source project is tracked. See [architecture](docs/architecture.md) and
   `work/*.log`, check REAPER licensing, and rerun with the locked Nix environment.
 - **Loudness/gain/peak failure:** inspect gain-pass logs and the voice itself. Large
   source differences need engineering judgment, not ever-higher makeup gain.
+  Gain uses measured post-FX/pre-limiter response, a safeguarded bracket and at
+  most eight passes; `loudness_stalled` stops non-improving searches. EQ, compressor,
+  true-peak state, gain bounds and limiter-load acceptance are unchanged.
 
 Do not publish a candidate solely because a file exists. A finished technical job
 must exit zero and report `status: complete` with `validation.complete: true`.

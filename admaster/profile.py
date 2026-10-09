@@ -124,7 +124,7 @@ def load_profile(path=None):
     if not g["minimum_db"] <= g["initial_db"] <= g["maximum_db"]:
         raise MasterError("profile", "initial gain outside limits")
     bound("gain", "max_correction_db", 0.1, 6)
-    bound("gain", "max_passes", 1, 4)
+    bound("gain", "max_passes", 1, 8)
     if int(g["max_passes"]) != g["max_passes"]:
         raise MasterError("profile", "max_passes must be integer")
     bound("quality", "minimum_speech_to_cut_threshold_db", 20, 40)

@@ -75,8 +75,39 @@ def sha256(path):
     return h.hexdigest()
 
 
-def inspect(path):
+def inspect(path, preserve_gaps=False):
     path = Path(path).expanduser().resolve()
+    if path.suffix.lower() in (".wav", ".flac") and path.is_file():
+        from . import audio
+
+        x, sr = audio.read(path)
+        if audio.sf.info(path).format not in ("WAV", "WAVEX", "RF64", "FLAC"):
+            raise MasterError(
+                "unsupported_project", "direct input must contain WAV/FLAC audio"
+            )
+        if len(x) / sr > 600:
+            raise MasterError("unsupported_project", "source exceeds ten-minute limit")
+        text = (
+            "<REAPER_PROJECT\n<TRACK\nNCHAN 2\nMAINSEND 1\n<ITEM\n"
+            f"POSITION 0\nLENGTH {len(x) / sr:.17g}\nSOFFS 0\n"
+            "VOLPAN 1 0 1 -1\nPLAYRATE 1 0 0 -1\n"
+            f"<SOURCE {'WAVE' if path.suffix.lower() == '.wav' else 'FLAC'}\n"
+            'FILE "source"\n>\n>\n>\n>\n'
+        )
+        index = next(
+            i for i, line in enumerate(text.splitlines()) if line.startswith("FILE ")
+        )
+        return {
+            "path": path,
+            "text": text,
+            "sources": [(index, path)],
+            "items": [{"position": 0, "length": len(x) / sr, "offset": 0}],
+            "duration": len(x) / sr,
+            "original_track_gain": 1,
+            "direct_audio": True,
+            "input_sha256": sha256(path),
+            "channel_policy": channel_policy(path),
+        }
     if path.suffix.lower() != ".rpp" or not path.is_file():
         raise MasterError("project", "expected an existing .rpp project")
     if path.stat().st_size > 8 * 1024 * 1024:
@@ -143,6 +174,22 @@ def inspect(path):
         "MASTERPLAYSPEEDENV",
     }
     for node in all_nodes:
+        if node.tag == "EXT":
+            item_metadata = any(
+                node in item.children for item in tr.children if item.tag == "ITEM"
+            )
+            if (
+                not item_metadata
+                or node.children
+                or not node.lines
+                or any(
+                    not line.startswith("ORIGINAL_FILENAME ") for _, line in node.lines
+                )
+            ):
+                raise MasterError(
+                    "unsupported_project", "unknown extension state requires review"
+                )
+            continue
         if node.tag not in allowed_chunks:
             raise MasterError(
                 "unsupported_project",
@@ -243,7 +290,7 @@ def inspect(path):
         )
     for a, b in zip(layout, layout[1:]):
         overlap = a["position"] + a["length"] - b["position"]
-        if abs(overlap) > 0.1 + 1e-9:
+        if overlap > 0.1 + 1e-9 or (not preserve_gaps and overlap < -0.1 - 1e-9):
             raise MasterError(
                 "unsupported_project", "gaps or overlaps over 100 ms require review"
             )
@@ -257,7 +304,25 @@ def inspect(path):
         "items": layout,
         "duration": duration,
         "original_track_gain": tr.number("VOLPAN", 1),
+        "input_sha256": sha256(path),
+        "channel_policy": channel_policy(sources[0][1]),
     }
+
+
+def channel_policy(path):
+    import numpy as np
+
+    from . import audio
+
+    x, _ = audio.read(path)
+    if x.shape[1] == 1:
+        return "mono"
+    if np.array_equal(x[:, 0], x[:, 1]):
+        return "identical_stereo_to_mono"
+    raise MasterError(
+        "unsupported_project",
+        "distinct stereo requires explicit reviewed channel selection; no automatic downmix",
+    )
 
 
 def copy_project(info, output):
@@ -276,9 +341,25 @@ def copy_project(info, output):
                 raise MasterError("copy", "source changed while copying")
             copied[source] = "media/" + name
             hashes[name] = digest
+            if info["channel_policy"] == "identical_stereo_to_mono":
+                from . import audio
+
+                x, sr = audio.read(source)
+                mono = "source-" + digest[:12] + "-mono.wav"
+                # Float64 preserves decoded source samples without gain/downmix rounding.
+                audio.sf.write(media / mono, x[:, 0], sr, subtype="DOUBLE")
+                copied[source] = "media/" + mono
+                info.setdefault("derived_hashes", {})[mono] = sha256(media / mono)
         lines[index] = '        FILE "' + copied[source] + '"'
+        if info["channel_policy"] == "identical_stereo_to_mono":
+            # FILE need not be the first source field.
+            for header in range(index - 1, -1, -1):
+                if lines[header].strip().startswith("<SOURCE "):
+                    lines[header] = "      <SOURCE WAVE"
+                    break
     # Save-relative source rewrite only; REAPER owns all other serialization.
     project = output / "master.rpp"
     project.write_text("\n".join(lines) + "\n")
-    shutil.copy2(info["path"], output / "original.rpp.backup")
+    if not info.get("direct_audio"):
+        shutil.copy2(info["path"], output / "original.rpp.backup")
     return project, hashes

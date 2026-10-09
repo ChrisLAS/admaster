@@ -42,6 +42,40 @@ def main():
         inventory = json.loads((root / "result/work/inventory.json").read_text())
         assert inventory["plugins"][-1]["true_peak"] is True
         assert inventory["hardware_outputs"] == [0]
+        # Exercise file-native ingestion through real REAPER, not a chat-built RPP.
+        import numpy as np
+        import soundfile as sf
+
+        samples, rate = sf.read(root / "source.wav")
+        for suffix, channels in (("wav", 1), ("flac", 2)):
+            direct = root / ("direct." + suffix)
+            sf.write(
+                direct,
+                samples if channels == 1 else np.column_stack((samples, samples)),
+                rate,
+                subtype="PCM_24",
+            )
+            original_bytes = direct.read_bytes()
+            file_result = run(
+                direct,
+                "--no-edit",
+                "--duration",
+                "20",
+                "--output",
+                root / ("direct-" + suffix),
+            )
+            assert (
+                file_result["status"] == "complete"
+                and file_result["validation"]["complete"]
+            )
+            assert file_result["frames"] == 20 * sr and file_result["limiter"]["valid"]
+            assert (
+                file_result["pause_cuts"] == 0 and file_result["stretch_percent"] == 0
+            )
+            assert file_result["channel_policy"] == (
+                "mono" if channels == 1 else "identical_stereo_to_mono"
+            )
+            assert direct.read_bytes() == original_bytes
         params = {p["name"]: p["value"] for p in inventory["plugins"][1]["parameters"]}
         assert params["RMS size"] == "5.0" and params["Ratio"] == "2.00"
         assert result["limiter"]["valid"]
@@ -77,6 +111,31 @@ def main():
             '<SOURCE WAVE\nFILE "source.wav"\n>\n>\n>\n>\n'
         )
         assert run(gapped, "--analyze-only")["status"] == "analyzed"
+        # Preserve a manually edited timeline with >100ms gap, fades and provenance.
+        edited = root / "edited.RPP"
+        edited_text = (
+            gapped.read_text()
+            .replace("POSITION 2.25", "POSITION 2.45")
+            .replace("LENGTH 17.75", "LENGTH 17.55")
+            .replace("SOFFS 2.25", "SOFFS 2.45")
+        )
+        edited_text = (
+            edited_text.replace(
+                "<SOURCE WAVE", "FADEIN 1 .01 0\nFADEOUT 1 .02 0\n<SOURCE FLAC"
+            )
+            .replace("source.wav", "direct.flac")
+            .replace(">\n>\n", ">\n<EXT\nORIGINAL_FILENAME /old/voice.flac\n>\n>\n", 2)
+        )
+        edited.write_text(edited_text)
+        preserved = run(
+            edited, "--no-edit", "--duration", "20", "--output", root / "edited-job"
+        )
+        assert preserved["status"] == "complete" and preserved["limiter"]["valid"]
+        assert preserved["pause_cuts"] == 0 and preserved["recovered_tail_seconds"] == 0
+        actual = json.loads((root / "edited-job/work/inventory.json").read_text())
+        assert abs(actual["items"][1]["position"] - 2.45) < 1e-8
+        assert abs(actual["items"][1]["offset"] - 2.45) < 1e-8
+        assert edited.read_text() == edited_text
         short = run(gapped, "--duration", "21", "--output", root / "short")
         assert short["status"] == "complete" and short["validation"]["complete"]
         assert short["frames"] == 20 * sr and short["stretch_percent"] == 0
@@ -128,7 +187,7 @@ def main():
         )
         assert "duration" in failure["errors"]
         print(
-            "PASS: isolated REAPER, plugins, exact and slightly short renders, gapped timeline, loudness, media preservation, failure handling"
+            "PASS: isolated REAPER, plugins, exact/slightly-short renders, direct WAV/FLAC, identical-stereo mono, edited metadata/gaps/fades, loudness, media preservation, failure handling"
         )
 
 

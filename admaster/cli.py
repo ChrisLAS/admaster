@@ -17,7 +17,7 @@ from .reaper import Reaper
 def parser():
     p = argparse.ArgumentParser(
         prog="admaster",
-        description="Master one continuous mono ad read at its original speed.",
+        description="Master a WAV/FLAC or edited REAPER ad read at its original speed.",
     )
     p.add_argument("project", nargs="?", type=Path)
     p.add_argument(
@@ -115,11 +115,10 @@ def doctor(args, profile):
 
 
 def process(args, profile):
-    info = rpp.inspect(args.project)
+    info = rpp.inspect(args.project, preserve_gaps=args.no_edit or args.analyze_only)
     source = info["sources"][0][1]
     source_meta = audio.probe(source)
-    if source_meta["channels"] != 1:
-        raise MasterError("unsupported_project", "source must be mono dialogue")
+
     if source_meta["duration"] > 600:
         raise MasterError("unsupported_project", "source exceeds ten-minute limit")
     for item in info["items"]:
@@ -211,6 +210,8 @@ def process(args, profile):
                 "stretch_percent": 0.0,
                 "project": str(project),
                 "auditory_review": "not_performed",
+                "channel_policy": info["channel_policy"],
+                "input": str(info["path"]),
             }
             if args.no_render:
                 result = {
@@ -232,23 +233,15 @@ def process(args, profile):
                     [i["position"] for i in inventory["items"][1:]],
                 )
                 history.append({"gain_db": gain, **validation})
+                write_json(work / "gain-passes.json", history)
+                write_json(work / "validation.json", validation)
+                if any(error != "loudness" for error in validation["errors"]):
+                    break
                 if "loudness" not in validation["errors"]:
                     break
-                correction = profile["render"]["lufs"] - validation["lufs"]
-                limit = profile["gain"]["max_correction_db"]
-                correction = max(-limit, min(limit, correction))
-                next_gain = gain + correction
-                if (
-                    not profile["gain"]["minimum_db"]
-                    <= next_gain
-                    <= profile["gain"]["maximum_db"]
-                ):
-                    raise MasterError(
-                        "gain_limit",
-                        "loudness needs gain outside the source-adjustment safety range",
-                    )
                 if attempt + 1 == profile["gain"]["max_passes"]:
                     break
+                next_gain = audio.next_gain(history, profile)
                 render.rename(work / f"pass-{attempt + 1}.wav")
                 gain = next_gain
                 job["gain_db"] = gain
@@ -273,7 +266,7 @@ def process(args, profile):
                     "limiter_load",
                     "limiter is working too hard; source dynamics need review",
                 )
-            if rpp.sha256(info["path"]) != rpp.sha256(output / "original.rpp.backup"):
+            if rpp.sha256(info["path"]) != info["input_sha256"]:
                 raise MasterError(
                     "source_changed",
                     "original project changed during the job; compare the backup",
@@ -284,6 +277,11 @@ def process(args, profile):
                     or rpp.sha256(source) != digest
                 ):
                     raise MasterError("source_changed", "source changed during the job")
+            for name, digest in info.get("derived_hashes", {}).items():
+                if rpp.sha256(output / "media" / name) != digest:
+                    raise MasterError(
+                        "source_changed", "derived mono media changed during the job"
+                    )
             result = {
                 **base,
                 **{
@@ -299,6 +297,7 @@ def process(args, profile):
                 "reaper_version": inventory["reaper_version"],
                 "limiter": limiter,
                 "source_hashes": hashes,
+                "derived_media_hashes": info.get("derived_hashes", {}),
                 "render_sha256": rpp.sha256(render),
             }
             if args.duration:

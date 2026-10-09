@@ -192,6 +192,50 @@ def validate(
     }
 
 
+def next_gain(history, profile):
+    """Measured post-FX/pre-limiter search; never change dynamics or QC limits."""
+    target = profile["render"]["lufs"]
+    g = profile["gain"]
+    current = history[-1]
+    if not all(math.isfinite(p[k]) for p in history for k in ("gain_db", "lufs")):
+        raise MasterError("measurement", "non-finite gain search measurement")
+    if len(history) >= 3:
+        best_before = min(abs(p["lufs"] - target) for p in history[:-2])
+        best_now = min(abs(p["lufs"] - target) for p in history)
+        if best_before - best_now < 0.05:
+            raise MasterError("loudness_stalled", "measured loudness stopped improving")
+    slope = 1.0
+    if len(history) >= 2:
+        previous = history[-2]
+        delta = current["gain_db"] - previous["gain_db"]
+        if abs(delta) > 1e-6:
+            measured = (current["lufs"] - previous["lufs"]) / delta
+            if 0.1 <= measured <= 2:
+                slope = measured
+    correction = (target - current["lufs"]) / slope
+    limit = g["max_correction_db"]
+    candidate = current["gain_db"] + max(-limit, min(limit, correction))
+    below = [p["gain_db"] for p in history if p["lufs"] < target]
+    above = [p["gain_db"] for p in history if p["lufs"] > target]
+    if below and above:
+        low, high = max(below), min(above)
+        if low >= high:
+            raise MasterError(
+                "loudness_stalled", "non-monotonic measured gain response"
+            )
+        if not low < candidate < high:
+            candidate = (low + high) / 2
+        candidate = current["gain_db"] + max(
+            -limit, min(limit, candidate - current["gain_db"])
+        )
+    if not g["minimum_db"] <= candidate <= g["maximum_db"]:
+        raise MasterError(
+            "gain_limit",
+            "loudness needs gain outside the source-adjustment safety range",
+        )
+    return candidate
+
+
 def limiter_activity(master, prelimit, profile):
     x, sr = read(prelimit)
     y, ys = read(master)
