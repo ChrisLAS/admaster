@@ -1,6 +1,6 @@
 # admaster
 
-Canonical private ad-read workflow for Nix Linux. The profile comes from an
+Canonical ad-read workflow for Nix Linux. The profile comes from an
 approved REAPER master; normal jobs need orchestration, not new EQ decisions.
 
 ## Run a job
@@ -65,5 +65,5 @@ nix run . -- --doctor --json
 
 Stage newly added implementation files before flake evaluation (Git flakes omit
 untracked files). For a release, also clone into a fresh directory and follow the
-README quick start. Keep GitHub visibility private; never push private audio,
-API keys, REAPER licenses, state caches, or host-specific paths.
+README quick start. Never push private audio, API keys, REAPER licenses, state
+caches, or host-specific paths.

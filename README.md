@@ -1,6 +1,6 @@
 # admaster
 
-Private, Nix-packaged podcast ad mastering in REAPER. One command creates an
+Nix-packaged podcast ad mastering in REAPER. One command creates an
 editable project and lossless WAV, tightens pauses at **original voice speed**,
 and checks duration, loudness, true peak, media integrity, and edit boundaries.
 
@@ -10,7 +10,7 @@ No gate, denoiser, saturation, or automatic de-esser. No time stretching.
 
 ## Quick start
 
-On a Nix Linux host with GitHub access to this private repository:
+On a Nix Linux host with GitHub access:
 
 ```sh
 gh repo clone ChrisLAS/admaster
@@ -127,9 +127,9 @@ The flake exposes `packages.<system>.admaster`/`default`, `apps.<system>.default
 `devShells.<system>.default`, `checks`, and `nixosModules.default`.
 Linux x86-64 is tested; Linux AArch64 outputs are provided and evaluated, but require
 an AArch64 builder to run their checks. Dependencies are pinned in `flake.lock`.
-The flake explicitly allows only its own private package and REAPER as unfree dependencies.
+The flake explicitly allows only its own unfree package and REAPER as unfree dependencies.
 
-Private remote execution, with SSH authentication already configured:
+Remote execution over SSH, with authentication already configured:
 
 ```sh
 nix run 'git+ssh://git@github.com/ChrisLAS/admaster?ref=main' -- ~/ads/project.rpp --duration 90
@@ -177,7 +177,8 @@ source project is tracked. See [architecture](docs/architecture.md) and
 
 ## Troubleshooting
 
-- **Private fetch fails:** clone with authenticated `gh`, or use authenticated SSH.
+- **Fetch fails:** retry; if it persists, clone with authenticated `gh`, or use
+  authenticated SSH.
 - **Output exists:** select a fresh `--output`; nothing is overwritten.
 - **Timing capacity/limit:** inspect `work/plan.json` if present and `report.json`;
   choose a realistic target or make a reviewed manual pause edit in a derived project.
